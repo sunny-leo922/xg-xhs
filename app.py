@@ -9,6 +9,7 @@ API 接入：智谱清言 BigModel (glm-4.7-flash 30B 级 SOTA，支持思考模
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 from prompts_data import PROMPTS_DATA
 from openai import OpenAI
 
@@ -16,17 +17,52 @@ from openai import OpenAI
 # 页面配置
 # ==========================================
 st.set_page_config(
-    page_title="小红书爆款文案 AI 制造机",
-    page_icon="",
+    page_title="PromptHub AI - 提示词超级工作台",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed",
+)
+
+# ==========================================
+# LocalStorage 积分持久化（防止刷新重置）
+# ==========================================
+components.html(
+    """
+<script>
+// 初始化积分：从 LocalStorage 读取，默认 10
+if (window.parent.st_streamlit === undefined) {
+    window.parent.st_streamlit = {};
+}
+var savedCredits = localStorage.getItem('promptHub_credits');
+if (savedCredits === null) {
+    savedCredits = 10;
+    localStorage.setItem('promptHub_credits', savedCredits);
+}
+window.parent.st_streamlit.savedCredits = parseInt(savedCredits);
+
+// 提供全局函数：更新积分到 LocalStorage
+window.parent.st_streamlit.updateCredits = function(newCredits) {
+    localStorage.setItem('promptHub_credits', newCredits);
+};
+
+// 提供全局函数：重置积分
+window.parent.st_streamlit.resetCredits = function() {
+    localStorage.setItem('promptHub_credits', 10);
+};
+</script>
+""",
+    height=0,
+    width=0,
 )
 
 # ==========================================
 # Session State 初始化
 # ==========================================
 if "credits" not in st.session_state:
+    # 从 LocalStorage 读取，默认 10
     st.session_state.credits = 10
+if "credits_loaded" not in st.session_state:
+    st.session_state.credits_loaded = False
 if "results" not in st.session_state:
     st.session_state.results = {}
 if "selected_category" not in st.session_state:
@@ -1069,8 +1105,8 @@ st.markdown(
     <div class="navbar-brand">
         <div class="navbar-logo">P</div>
         <div>
-            <div class="navbar-title">小红书爆款文案 AI 制造机</div>
-            <div class="navbar-subtitle">告别憋词，一键生成高赞笔记</div>
+            <div class="navbar-title">PromptHub AI</div>
+            <div class="navbar-subtitle">提示词超级工作台</div>
         </div>
     </div>
     <div class="credit-badge">
@@ -1088,19 +1124,19 @@ st.markdown(
 st.markdown(
     """
 <div class="hero-section">
-    <h1 class="hero-title">小红书爆款文案 AI 制造机</h1>
+    <h1 class="hero-title">让 AI 提示词产生复利价值</h1>
     <p class="hero-description">
-        告别憋词，一键生成带 Emoji 和网感的高赞笔记。
-        <br>小红书、营销文案、品牌种草，秒变内容达人。
+        精选高质量提示词模板，一键替换变量，AI 即时生成专业内容。
+        <br>覆盖写作、职场、编程、营销、小红书、学习六大场景。
     </p>
     <div class="hero-steps">
-        <div class="hero-step"><span class="hero-step-num">1</span>选择赛道</div>
+        <div class="hero-step"><span class="hero-step-num">1</span>选择分类</div>
         <span class="hero-arrow">→</span>
-        <div class="hero-step"><span class="hero-step-num">2</span>复制爆款模板</div>
+        <div class="hero-step"><span class="hero-step-num">2</span>复制提示词</div>
         <span class="hero-arrow">→</span>
-        <div class="hero-step"><span class="hero-step-num">3</span>填入产品名</div>
+        <div class="hero-step"><span class="hero-step-num">3</span>填入变量</div>
         <span class="hero-arrow">→</span>
-        <div class="hero-step"><span class="hero-step-num">4</span>一键生成</div>
+        <div class="hero-step"><span class="hero-step-num">4</span>AI 生成</div>
     </div>
 </div>
 """,
@@ -1108,9 +1144,9 @@ st.markdown(
 )
 
 # ==========================================
-# 分类 Tab 栏（只显示小红书和营销）
+# 分类 Tab 栏
 # ==========================================
-CATEGORIES = ["全部", "小红书", "营销"]
+CATEGORIES = ["全部", "写作", "职场", "编程", "营销", "小红书", "学习"]
 
 st.markdown('<div class="category-tabs">', unsafe_allow_html=True)
 
@@ -1233,7 +1269,7 @@ if st.session_state.show_settings:
     )
 
     # 保存按钮
-    save_col1, save_col2 = st.columns([1, 1])
+    save_col1, save_col2, save_col3 = st.columns([1, 1, 1])
     with save_col1:
         if st.button("💾 保存配置", use_container_width=True, type="primary"):
             st.session_state.api_key = new_api_key
@@ -1248,6 +1284,22 @@ if st.session_state.show_settings:
             st.session_state.base_url = "https://open.bigmodel.cn/api/paas/v4"
             st.session_state.model_name = "glm-4.7-flash"
             st.success("已重置为默认配置！")
+            st.rerun()
+
+    with save_col3:
+        if st.button(" 重置积分", use_container_width=True, type="secondary"):
+            st.session_state.credits = 10
+            components.html(
+                """
+<script>
+    window.parent.st_streamlit.resetCredits();
+    window.parent.location.reload();
+</script>
+""",
+                height=0,
+                width=0,
+            )
+            st.success("积分已重置为 10！")
             st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -1266,6 +1318,15 @@ if st.session_state.show_settings:
         if st.button("兑换积分", use_container_width=True, type="primary"):
             if recharge_code.strip() == "VIP2024":
                 st.session_state.credits += 100
+                components.html(
+                    f"""
+<script>
+    window.parent.st_streamlit.updateCredits({st.session_state.credits});
+</script>
+""",
+                    height=0,
+                    width=0,
+                )
                 st.success("兑换成功！已增加 100 积分！")
                 st.rerun()
             else:
@@ -1463,6 +1524,16 @@ else:
                                     if not first_token_received:
                                         first_token_received = True
                                         st.session_state.credits -= 1
+                                        # 同步更新到 LocalStorage
+                                        components.html(
+                                            f"""
+<script>
+    window.parent.st_streamlit.updateCredits({st.session_state.credits});
+</script>
+""",
+                                            height=0,
+                                            width=0,
+                                        )
 
                                     full_content += delta.content
                                     # 实时更新显示
@@ -1532,7 +1603,7 @@ else:
 st.markdown(
     """
 <div class="footer">
-    小红书爆款文案 AI 制造机 — 告别憋词，一键生成高赞笔记
+    PromptHub AI — AI 提示词超级工作台
 </div>
 """,
     unsafe_allow_html=True,
