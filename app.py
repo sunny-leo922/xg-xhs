@@ -1146,7 +1146,7 @@ st.markdown(
 # ==========================================
 # 分类 Tab 栏
 # ==========================================
-CATEGORIES = ["全部", "写作", "职场", "编程", "营销", "小红书", "学习"]
+CATEGORIES = ["全部", "小红书", "营销"]
 
 st.markdown('<div class="category-tabs">', unsafe_allow_html=True)
 
